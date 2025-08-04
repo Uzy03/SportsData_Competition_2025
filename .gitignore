@@ -32,3 +32,4 @@ data/
 *.tgz
 /test_saved_data_parquet
 /test_saved_data_feather
+/Preprocessed_data
