@@ -18,7 +18,7 @@ players_path = "data/2022_data/*/players.csv"
 con = load_to_database(tracking_path, play_path, players_path)
 assert con is not None, "DBロード失敗"
 
-"""
+#"""
 # SQLクエリ例: テーブルのカラム名を取得
 try:
     df_tracking = con.execute("PRAGMA table_info(tracking)").df()
@@ -62,8 +62,9 @@ try:
     print(df_players)
 except Exception as e:
     print(f"クエリエラー: {e}")
-"""
+#"""
 
+"""
 # SQLクエリ例: 選手の情報を取得
 
 # trackingからランダムに1行取得
@@ -90,5 +91,5 @@ else:
     else:
         print("players情報:")
         print(players_df)
-
+#"""
 con.close()
