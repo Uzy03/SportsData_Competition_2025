@@ -9,7 +9,7 @@ def main():
     parser = argparse.ArgumentParser(description="Soccer Player2Vec モデルの学習")
     parser.add_argument("--data_dir", type=str, default="Preprocessed_data/parquet", 
                        help="データディレクトリのパス")
-    parser.add_argument("--batch_size", type=int, default=32, help="バッチサイズ")
+    parser.add_argument("--batch_size", type=int, default=64, help="バッチサイズ")
     parser.add_argument("--max_epochs", type=int, default=100, help="最大エポック数")
     parser.add_argument("--lr", type=float, default=1e-3, help="学習率")
     parser.add_argument("--max_files", type=int, default=None, help="使用する最大ファイル数（Noneで全ファイル）")
