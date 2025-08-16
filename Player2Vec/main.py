@@ -61,16 +61,26 @@ def main():
     logger = CSVLogger("logs", name="soccer_player2vec")
     
     # トレーナーの設定
+    if torch.cuda.is_available():
+        accelerator = "gpu"
+        devices = args.devices
+        precision = "16-mixed"
+    else:
+        accelerator = "cpu"
+        devices = 1
+        precision = "32-true"
+
     trainer = pl.Trainer(
         max_epochs=args.max_epochs,
-        devices=args.devices if torch.cuda.is_available() else 1,  # gpus → devices
+        accelerator=accelerator,
+        devices=devices,
         callbacks=callbacks,
-        logger=logger,  # CSVLoggerを使用
+        logger=logger,
         log_every_n_steps=10,
-        val_check_interval=0.25,  # 4エポックごとに検証
-        gradient_clip_val=1.0,    # 勾配クリッピング
-        accumulate_grad_batches=2, # 勾配蓄積
-        precision="16-mixed",      # precision → precision_mode
+        val_check_interval=0.25,
+        gradient_clip_val=1.0,
+        accumulate_grad_batches=2,
+        precision=precision,
     )
     
     # 学習の実行
