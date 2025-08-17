@@ -10,9 +10,12 @@ CKPT_PATH=${1:-checkpoints/last.ckpt}
 FEATHER_DIR=${2:-Preprocessed_data/feather}
 OUT_DIR=${3:-checkpoints}
 
+# Ensure Python can import the project package (works in Docker/workspace)
+export PYTHONPATH=${PYTHONPATH:-$(pwd)}
+
 mkdir -p "$OUT_DIR"
 
-python Player2Vec/build_player_embeddings.py \
+python -m Player2Vec.build_player_embeddings \
   --feather_dir "$FEATHER_DIR" \
   --ckpt "$CKPT_PATH" \
   --win 150 \
