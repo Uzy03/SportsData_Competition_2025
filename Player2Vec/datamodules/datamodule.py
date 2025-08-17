@@ -249,13 +249,23 @@ class SoccerDataModule(pl.LightningDataModule):
         print(f"  テスト: {len(self.test_dataset)} ({self.test_ratio*100:.1f}%)")
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=0)
+        kwargs = self._loader_kwargs()
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, **kwargs)
     
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=0)
+        kwargs = self._loader_kwargs()
+        return DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, **kwargs)
     
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=0)
+        kwargs = self._loader_kwargs()
+        return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, **kwargs)
+
+    def _loader_kwargs(self):
+        """Return DataLoader kwargs depending on GPU availability."""
+        if torch.cuda.is_available():
+            return {"num_workers": 12, "pin_memory": True}
+        else:
+            return {"num_workers": 0, "pin_memory": False}
 
 class PreprocessedSoccerDataModule(pl.LightningDataModule):
     def __init__(self, data_dir="Preprocessed_data/parquet", batch_size=32, 
@@ -302,28 +312,35 @@ class PreprocessedSoccerDataModule(pl.LightningDataModule):
         print(f"  テスト: {len(self.test_dataset)} ({self.test_ratio*100:.1f}%)")
     
     def train_dataloader(self):
+        kwargs = self._loader_kwargs()
         return DataLoader(
             self.train_dataset, 
             batch_size=self.batch_size, 
             shuffle=True, 
-            num_workers=0,  # マルチプロセシングを無効化
-            pin_memory=False  # MPSではpin_memoryをFalseに
+            **kwargs
         )
     
     def val_dataloader(self):
+        kwargs = self._loader_kwargs()
         return DataLoader(
             self.val_dataset, 
             batch_size=self.batch_size, 
             shuffle=False, 
-            num_workers=0,  # マルチプロセシングを無効化
-            pin_memory=False  # MPSではpin_memoryをFalseに
+            **kwargs
         )
     
     def test_dataloader(self):
+        kwargs = self._loader_kwargs()
         return DataLoader(
             self.test_dataset, 
             batch_size=self.batch_size, 
             shuffle=False, 
-            num_workers=0,  # マルチプロセシングを無効化
-            pin_memory=False  # MPSではpin_memoryをFalseに
+            **kwargs
         )
+
+    def _loader_kwargs(self):
+        """Return DataLoader kwargs depending on GPU availability."""
+        if torch.cuda.is_available():
+            return {"num_workers": 12, "pin_memory": True}
+        else:
+            return {"num_workers": 0, "pin_memory": False}

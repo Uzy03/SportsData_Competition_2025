@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage:
+#   scripts/build_embeddings.sh <CKPT_PATH> [FEATHER_DIR] [OUT_DIR]
+# Example:
+#   scripts/build_embeddings.sh checkpoints/last.ckpt Preprocessed_data/feather checkpoints
+
+CKPT_PATH=${1:-checkpoints/last.ckpt}
+FEATHER_DIR=${2:-Preprocessed_data/feather}
+OUT_DIR=${3:-checkpoints}
+
+mkdir -p "$OUT_DIR"
+
+python Player2Vec/build_player_embeddings.py \
+  --feather_dir "$FEATHER_DIR" \
+  --ckpt "$CKPT_PATH" \
+  --win 150 \
+  --stride 75 \
+  --out_pt "$OUT_DIR/player_embeddings.pt" \
+  --out_csv "$OUT_DIR/player_embeddings.csv"
+
+echo "Embeddings written to: $OUT_DIR/player_embeddings.pt and .csv"
