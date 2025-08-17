@@ -317,8 +317,7 @@ class PreprocessedSoccerDataModule(pl.LightningDataModule):
             self.train_dataset, 
             batch_size=self.batch_size, 
             shuffle=True, 
-            num_workers=12,  # マルチプロセシングを無効化
-            pin_memory=True  # MPSではpin_memoryをFalseに
+            **kwargs
         )
     
     def val_dataloader(self):
@@ -327,8 +326,7 @@ class PreprocessedSoccerDataModule(pl.LightningDataModule):
             self.val_dataset, 
             batch_size=self.batch_size, 
             shuffle=False, 
-            num_workers=12,  # マルチプロセシングを無効化
-            pin_memory=True  # MPSではpin_memoryをFalseに
+            **kwargs
         )
     
     def test_dataloader(self):
@@ -337,6 +335,12 @@ class PreprocessedSoccerDataModule(pl.LightningDataModule):
             self.test_dataset, 
             batch_size=self.batch_size, 
             shuffle=False, 
-            num_workers=12,  # マルチプロセシングを無効化
-            pin_memory=True  # MPSではpin_memoryをFalseに
+            **kwargs
         )
+
+    def _loader_kwargs(self):
+        """Return DataLoader kwargs depending on GPU availability."""
+        if torch.cuda.is_available():
+            return {"num_workers": 12, "pin_memory": True}
+        else:
+            return {"num_workers": 0, "pin_memory": False}
