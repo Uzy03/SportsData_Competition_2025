@@ -6,7 +6,7 @@ set -euo pipefail
 # Example:
 #   scripts/build_embeddings.sh checkpoints/last.ckpt Preprocessed_data/feather checkpoints
 
-CKPT_PATH=${1:-checkpoints/last.ckpt}
+CKPT_PATH=${1:-checkpoints/soccer_model_epoch=11_val_loss=0.6879.ckpt}
 FEATHER_DIR=${2:-Preprocessed_data/feather}
 OUT_DIR=${3:-checkpoints}
 
