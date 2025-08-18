@@ -42,7 +42,8 @@ CMD=(python -m Player2Vec.infer_style \
   --question "${QUESTION}" \
   --emb "${EMB_PATH}" \
   --model "${MODEL}" \
-  --max_new_tokens "${MAX_NEW_TOKENS}")
+  --max_new_tokens "${MAX_NEW_TOKENS}" \
+  --bridge_ja_en)
 
 if [[ -n "${PLAYER_ID}" ]]; then
   # Use explicit player id; ignore players_csv
