@@ -187,7 +187,14 @@ def _translate(text: str, model_name: str, device: Optional[str] = None) -> str:
     mdl = mdl.to(device)
     batch = tok(text, return_tensors="pt", truncation=True).to(device)
     with torch.no_grad():
-        out = mdl.generate(**batch, max_new_tokens=256)
+        out = mdl.generate(
+            **batch,
+            max_new_tokens=256,
+            num_beams=5,
+            early_stopping=True,
+            no_repeat_ngram_size=3,
+            length_penalty=1.0,
+        )
     return tok.decode(out[0], skip_special_tokens=True)
 
 

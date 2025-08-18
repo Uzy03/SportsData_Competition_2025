@@ -108,6 +108,10 @@ class SLMWrapper(nn.Module):
             max_new_tokens=max_new_tokens,
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
+            temperature=0.7,
+            top_p=0.9,
+            no_repeat_ngram_size=3,
+            repetition_penalty=1.2,
         )
         text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True).strip()
         return text
