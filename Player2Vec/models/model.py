@@ -79,6 +79,11 @@ class SLMWrapper(nn.Module):
         super().__init__()
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(model_name)
+        # Ensure pad token is set to eos if missing (common for GPT2 family)
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        if getattr(self.model.config, "pad_token_id", None) is None:
+            self.model.config.pad_token_id = self.tokenizer.pad_token_id
         for p in self.model.parameters():
             p.requires_grad = False
         self.hidden = self.model.config.hidden_size
@@ -91,11 +96,20 @@ class SLMWrapper(nn.Module):
         if p.dim() == 1:
             p = p.unsqueeze(0)
         prefix = self.p_proj(p) + self.decoder_prefix  # (B, hidden)
-        input_ids = self.tokenizer(question, return_tensors="pt").input_ids.to(device)
-        inputs_embeds = self.model.transformer.wte(input_ids)
+        tokens = self.tokenizer(question, return_tensors="pt", add_special_tokens=False)
+        input_ids = tokens.input_ids.to(device)
+        inputs_embeds = self.model.get_input_embeddings()(input_ids)
         inputs_embeds = torch.cat([prefix.unsqueeze(1), inputs_embeds], dim=1)
-        output_ids = self.model.generate(inputs_embeds=inputs_embeds, max_new_tokens=max_new_tokens)
-        text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        # Build attention mask for prefix+tokens
+        attention_mask = torch.ones(inputs_embeds.size()[:2], dtype=torch.long, device=device)
+        output_ids = self.model.generate(
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            max_new_tokens=max_new_tokens,
+            pad_token_id=self.tokenizer.pad_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+        )
+        text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True).strip()
         return text
 
 class SoccerLightningModule(pl.LightningModule):

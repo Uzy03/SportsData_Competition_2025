@@ -2,10 +2,12 @@ import argparse
 import os
 import re
 import csv
+from functools import lru_cache
 from typing import Dict, Optional, List, Tuple
 
 import torch
 from difflib import get_close_matches
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 from Player2Vec.models.model import SLMWrapper
 
@@ -171,7 +173,25 @@ def _resolve_player_id(question: str, roster: List[Dict[str, str]]) -> Optional[
     return None
 
 
-def generate_style(player_id: Optional[str], question: str, emb_path: str, model_name: str = "distilgpt2", device: Optional[str] = None, max_new_tokens: int = 64, players_csv: Optional[str] = None) -> str:
+@lru_cache(maxsize=2)
+def _load_mt(model_name: str):
+    tok = AutoTokenizer.from_pretrained(model_name)
+    mdl = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    return tok, mdl
+
+
+def _translate(text: str, model_name: str, device: Optional[str] = None) -> str:
+    tok, mdl = _load_mt(model_name)
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    mdl = mdl.to(device)
+    batch = tok(text, return_tensors="pt", truncation=True).to(device)
+    with torch.no_grad():
+        out = mdl.generate(**batch, max_new_tokens=256)
+    return tok.decode(out[0], skip_special_tokens=True)
+
+
+def generate_style(player_id: Optional[str], question: str, emb_path: str, model_name: str = "distilgpt2", device: Optional[str] = None, max_new_tokens: int = 64, players_csv: Optional[str] = None, bridge_ja_en: bool = False, mt_ja_en: str = "Helsinki-NLP/opus-mt-ja-en", mt_en_ja: str = "Helsinki-NLP/opus-mt-en-ja") -> str:
     """
     Load p from emb_path and generate natural language with SLMWrapper.
     emb_path: .pt/.pth (dict id->tensor) or .csv
@@ -208,7 +228,14 @@ def generate_style(player_id: Optional[str], question: str, emb_path: str, model
     slm = slm.to(device)
 
     with torch.no_grad():
-        text = slm.generate(p.to(device), question, max_new_tokens=max_new_tokens)
+        if bridge_ja_en:
+            # JA -> EN
+            en_q = _translate(question, mt_ja_en, device=device)
+            en_out = slm.generate(p.to(device), en_q, max_new_tokens=max_new_tokens)
+            # EN -> JA
+            text = _translate(en_out, mt_en_ja, device=device)
+        else:
+            text = slm.generate(p.to(device), question, max_new_tokens=max_new_tokens)
     return text
 
 
@@ -220,6 +247,9 @@ def main():
     parser.add_argument("--model", type=str, default="distilgpt2", help="HF Causal LM model name")
     parser.add_argument("--max_new_tokens", type=int, default=64)
     parser.add_argument("--players_csv", type=str, default=None, help="Roster CSV with columns: id,name,team,alt_names (alt separated by '|')")
+    parser.add_argument("--bridge_ja_en", action="store_true", help="Translate JA→EN for input and EN→JA for output")
+    parser.add_argument("--mt_ja_en", type=str, default="Helsinki-NLP/opus-mt-ja-en", help="MT model for JA→EN")
+    parser.add_argument("--mt_en_ja", type=str, default="Helsinki-NLP/opus-mt-en-ja", help="MT model for EN→JA")
     args = parser.parse_args()
 
     answer = generate_style(
@@ -229,6 +259,9 @@ def main():
         model_name=args.model,
         max_new_tokens=args.max_new_tokens,
         players_csv=args.players_csv,
+        bridge_ja_en=args.bridge_ja_en,
+        mt_ja_en=args.mt_ja_en,
+        mt_en_ja=args.mt_en_ja,
     )
     print(answer)
 
