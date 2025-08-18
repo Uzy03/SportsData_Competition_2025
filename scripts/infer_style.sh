@@ -16,7 +16,7 @@ DEFAULT_QUESTION="川崎フロンターレの家長　昭博選手について�
 DEFAULT_EMB_PATH="checkpoints/player_embeddings.pt"
 DEFAULT_PLAYERS_CSV="data/players.csv"
 DEFAULT_MODEL="distilgpt2"
-DEFAULT_MAX_NEW_TOKENS="64"
+DEFAULT_MAX_NEW_TOKENS="128"
 # If set (non-empty), skip name resolution and use this id directly
 DEFAULT_PLAYER_ID="4609"
 # ----------------------------------------
@@ -43,7 +43,9 @@ CMD=(python -m Player2Vec.infer_style \
   --emb "${EMB_PATH}" \
   --model "${MODEL}" \
   --max_new_tokens "${MAX_NEW_TOKENS}" \
-  --bridge_ja_en)
+  --bridge_ja_en \
+  --mt_ja_en staka/fugumt-ja-en \
+  --mt_en_ja staka/fugumt-en-ja)
 
 if [[ -n "${PLAYER_ID}" ]]; then
   # Use explicit player id; ignore players_csv
