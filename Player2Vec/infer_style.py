@@ -198,7 +198,25 @@ def _translate(text: str, model_name: str, device: Optional[str] = None) -> str:
     return tok.decode(out[0], skip_special_tokens=True)
 
 
-def generate_style(player_id: Optional[str], question: str, emb_path: str, model_name: str = "distilgpt2", device: Optional[str] = None, max_new_tokens: int = 64, players_csv: Optional[str] = None, bridge_ja_en: bool = False, mt_ja_en: str = "Helsinki-NLP/opus-mt-ja-en", mt_en_ja: str = "Helsinki-NLP/opus-mt-en-ja") -> str:
+def generate_style(
+    player_id: Optional[str],
+    question: str,
+    emb_path: str,
+    model_name: str = "distilgpt2",
+    device: Optional[str] = None,
+    max_new_tokens: int = 64,
+    players_csv: Optional[str] = None,
+    bridge_ja_en: bool = False,
+    mt_ja_en: str = "Helsinki-NLP/opus-mt-ja-en",
+    mt_en_ja: str = "Helsinki-NLP/opus-mt-en-ja",
+    # decoding params for SLM
+    temperature: float = 0.7,
+    top_p: float = 0.9,
+    repetition_penalty: float = 1.2,
+    no_repeat_ngram_size: int = 3,
+    # prompt templating
+    use_prompt_template: bool = False,
+) -> str:
     """
     Load p from emb_path and generate natural language with SLMWrapper.
     emb_path: .pt/.pth (dict id->tensor) or .csv
@@ -234,15 +252,47 @@ def generate_style(player_id: Optional[str], question: str, emb_path: str, model
         device = "cuda" if torch.cuda.is_available() else "cpu"
     slm = slm.to(device)
 
+    # Optional prompt template
+    prompt = question
+    if use_prompt_template:
+        # Try to enrich with roster info if available
+        team, name = _parse_question_for_player(question)
+        context_bits = []
+        if name:
+            context_bits.append(f"選手名: {name}")
+        if team:
+            context_bits.append(f"チーム: {team}")
+        context = "、".join(context_bits)
+        if context:
+            prompt = f"{context}\nこの選手のプレースタイルや特徴、強み、代表的なプレー例を簡潔に説明してください。\n質問: {question}"
+        else:
+            prompt = f"この選手のプレースタイルや特徴、強み、代表的なプレー例を簡潔に説明してください。\n質問: {question}"
+
     with torch.no_grad():
         if bridge_ja_en:
             # JA -> EN
-            en_q = _translate(question, mt_ja_en, device=device)
-            en_out = slm.generate(p.to(device), en_q, max_new_tokens=max_new_tokens)
+            en_q = _translate(prompt, mt_ja_en, device=device)
+            en_out = slm.generate(
+                p.to(device),
+                en_q,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty,
+                no_repeat_ngram_size=no_repeat_ngram_size,
+            )
             # EN -> JA
             text = _translate(en_out, mt_en_ja, device=device)
         else:
-            text = slm.generate(p.to(device), question, max_new_tokens=max_new_tokens)
+            text = slm.generate(
+                p.to(device),
+                prompt,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty,
+                no_repeat_ngram_size=no_repeat_ngram_size,
+            )
     return text
 
 
@@ -251,12 +301,20 @@ def main():
     parser.add_argument("--player_id", type=str, required=False, help="If omitted, resolve from question using --players_csv")
     parser.add_argument("--question", type=str, required=True)
     parser.add_argument("--emb", type=str, default="checkpoints/player_embeddings.pt", help="Path to p embeddings (.pt/.pth/.csv)")
-    parser.add_argument("--model", type=str, default="distilgpt2", help="HF Causal LM model name")
+    parser.add_argument("--model", type=str, default="rinna/japanese-gpt2-medium", help="HF Causal LM model name")
     parser.add_argument("--max_new_tokens", type=int, default=64)
     parser.add_argument("--players_csv", type=str, default=None, help="Roster CSV with columns: id,name,team,alt_names (alt separated by '|')")
+    # Decoding params (SLM)
+    parser.add_argument("--temperature", type=float, default=0.7)
+    parser.add_argument("--top_p", type=float, default=0.9)
+    parser.add_argument("--repetition_penalty", type=float, default=1.2)
+    parser.add_argument("--no_repeat_ngram_size", type=int, default=3)
+    # Prompt template
+    parser.add_argument("--use_prompt_template", action="store_true")
+    # MT bridge (off by default, kept for optional use)
     parser.add_argument("--bridge_ja_en", action="store_true", help="Translate JA→EN for input and EN→JA for output")
-    parser.add_argument("--mt_ja_en", type=str, default="Helsinki-NLP/opus-mt-ja-en", help="MT model for JA→EN")
-    parser.add_argument("--mt_en_ja", type=str, default="Helsinki-NLP/opus-mt-en-ja", help="MT model for EN→JA")
+    parser.add_argument("--mt_ja_en", type=str, default="staka/fugumt-ja-en", help="MT model for JA→EN")
+    parser.add_argument("--mt_en_ja", type=str, default="staka/fugumt-en-ja", help="MT model for EN→JA")
     args = parser.parse_args()
 
     answer = generate_style(
@@ -269,6 +327,11 @@ def main():
         bridge_ja_en=args.bridge_ja_en,
         mt_ja_en=args.mt_ja_en,
         mt_en_ja=args.mt_en_ja,
+        temperature=args.temperature,
+        top_p=args.top_p,
+        repetition_penalty=args.repetition_penalty,
+        no_repeat_ngram_size=args.no_repeat_ngram_size,
+        use_prompt_template=args.use_prompt_template,
     )
     print(answer)
 

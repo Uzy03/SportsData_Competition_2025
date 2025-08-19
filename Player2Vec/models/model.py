@@ -91,7 +91,17 @@ class SLMWrapper(nn.Module):
         self.decoder_prefix = nn.Parameter(torch.zeros(1, self.hidden))
         self.p_proj = nn.Linear(256, self.hidden)
 
-    def generate(self, p: torch.Tensor, question: str, max_new_tokens: int = 32) -> str:
+    def generate(
+        self,
+        p: torch.Tensor,
+        question: str,
+        max_new_tokens: int = 32,
+        *,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        repetition_penalty: float = 1.2,
+        no_repeat_ngram_size: int = 3,
+    ) -> str:
         device = next(self.parameters()).device
         if p.dim() == 1:
             p = p.unsqueeze(0)
@@ -109,10 +119,10 @@ class SLMWrapper(nn.Module):
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             do_sample=True,
-            temperature=0.7,
-            top_p=0.9,
-            no_repeat_ngram_size=3,
-            repetition_penalty=1.2,
+            temperature=temperature,
+            top_p=top_p,
+            no_repeat_ngram_size=no_repeat_ngram_size,
+            repetition_penalty=repetition_penalty,
         )
         text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True).strip()
         return text

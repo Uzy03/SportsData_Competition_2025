@@ -15,10 +15,17 @@ set -euo pipefail
 DEFAULT_QUESTION="川崎フロンターレの家長　昭博選手について教えて"
 DEFAULT_EMB_PATH="checkpoints/player_embeddings.pt"
 DEFAULT_PLAYERS_CSV="data/players.csv"
-DEFAULT_MODEL="distilgpt2"
+DEFAULT_MODEL="rinna/japanese-gpt2-medium"
 DEFAULT_MAX_NEW_TOKENS="128"
 # If set (non-empty), skip name resolution and use this id directly
 DEFAULT_PLAYER_ID="4609"
+# Decoding defaults
+DEFAULT_TEMPERATURE="0.7"
+DEFAULT_TOP_P="0.9"
+DEFAULT_REPETITION_PENALTY="1.2"
+DEFAULT_NO_REPEAT_NGRAM_SIZE="3"
+# Prompt template (on by default)
+DEFAULT_USE_PROMPT_TEMPLATE="1"
 # ----------------------------------------
 
 QUESTION=${1:-${DEFAULT_QUESTION}}
@@ -43,9 +50,15 @@ CMD=(python -m Player2Vec.infer_style \
   --emb "${EMB_PATH}" \
   --model "${MODEL}" \
   --max_new_tokens "${MAX_NEW_TOKENS}" \
-  --bridge_ja_en \
-  --mt_ja_en staka/fugumt-ja-en \
-  --mt_en_ja staka/fugumt-en-ja)
+  --temperature "${DEFAULT_TEMPERATURE}" \
+  --top_p "${DEFAULT_TOP_P}" \
+  --repetition_penalty "${DEFAULT_REPETITION_PENALTY}" \
+  --no_repeat_ngram_size "${DEFAULT_NO_REPEAT_NGRAM_SIZE}")
+
+# Toggle prompt template
+if [[ "${DEFAULT_USE_PROMPT_TEMPLATE}" == "1" ]]; then
+  CMD+=(--use_prompt_template)
+fi
 
 if [[ -n "${PLAYER_ID}" ]]; then
   # Use explicit player id; ignore players_csv
