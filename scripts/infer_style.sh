@@ -28,6 +28,10 @@ DEFAULT_NO_REPEAT_NGRAM_SIZE="3"
 DEFAULT_USE_PROMPT_TEMPLATE="1"
 # Bridge JA↔EN (on by default): JA question → EN generate → JA answer
 DEFAULT_BRIDGE_JA_EN="1"
+# Prefix control (stabilization)
+DEFAULT_PREFIX_SCALE="0.05"
+DEFAULT_PREFIX_LEN="8"
+DEFAULT_NO_PREFIX="0"  # set to 1 to disable prefix injection
 # ----------------------------------------
 
 QUESTION=${1:-${DEFAULT_QUESTION}}
@@ -55,7 +59,9 @@ CMD=(python -m Player2Vec.infer_style \
   --temperature "${DEFAULT_TEMPERATURE}" \
   --top_p "${DEFAULT_TOP_P}" \
   --repetition_penalty "${DEFAULT_REPETITION_PENALTY}" \
-  --no_repeat_ngram_size "${DEFAULT_NO_REPEAT_NGRAM_SIZE}")
+  --no_repeat_ngram_size "${DEFAULT_NO_REPEAT_NGRAM_SIZE}" \
+  --prefix_scale "${DEFAULT_PREFIX_SCALE}" \
+  --prefix_len "${DEFAULT_PREFIX_LEN}")
 
 # Toggle prompt template
 if [[ "${DEFAULT_USE_PROMPT_TEMPLATE}" == "1" ]]; then
@@ -65,6 +71,11 @@ fi
 # Toggle JA↔EN bridge
 if [[ "${DEFAULT_BRIDGE_JA_EN}" == "1" ]]; then
   CMD+=(--bridge_ja_en)
+fi
+
+# Toggle no_prefix baseline
+if [[ "${DEFAULT_NO_PREFIX}" == "1" ]]; then
+  CMD+=(--no_prefix)
 fi
 
 if [[ -n "${PLAYER_ID}" ]]; then

@@ -43,6 +43,7 @@ Defaults are configurable at the top of `scripts/infer_style.sh`:
 - Decoding: `DEFAULT_TEMPERATURE`, `DEFAULT_TOP_P`, `DEFAULT_REPETITION_PENALTY`, `DEFAULT_NO_REPEAT_NGRAM_SIZE`
 - Prompt template toggle: `DEFAULT_USE_PROMPT_TEMPLATE` (on by default)
 - JA↔EN bridge: `DEFAULT_BRIDGE_JA_EN` (on by default)
+- Prefix control (stabilization): `DEFAULT_PREFIX_SCALE` (0.05), `DEFAULT_PREFIX_LEN` (8), `DEFAULT_NO_PREFIX` (0 to enable)
 
 Or call Python directly with full control:
 
@@ -56,6 +57,7 @@ python -m Player2Vec.infer_style \
   --use_prompt_template \
   --temperature 0.7 --top_p 0.9 \
   --repetition_penalty 1.2 --no_repeat_ngram_size 3 \
+  --prefix_scale 0.05 --prefix_len 8 \
   --bridge_ja_en \
   --mt_ja_en staka/fugumt-ja-en \
   --mt_en_ja staka/fugumt-en-ja
@@ -65,6 +67,25 @@ python -m Player2Vec.infer_style \
 
 - The style LM receives the player embedding `p` (dim=256, L2-normalized) projected to the LM hidden size and prepended as a soft prefix to the question tokens.
 - By default we generate with an English LM and translate JA→EN for input and EN→JA for output. You can disable the bridge by omitting `--bridge_ja_en`.
+
+### Stabilization Flags
+
+- `--prefix_scale` (float, default 0.05): scales the soft prefix strength. Try 0.05→0.1.
+- `--prefix_len` (int, default 8): length of the soft prefix tokens. Try 8.
+- `--no_prefix`: disables prefix injection for baseline comparison.
+- Suggested decoding: `--temperature 0.2~0.4`, `--top_p 0.9`, `--no_repeat_ngram_size 4`, `--repetition_penalty 1.1`.
+
+## Troubleshooting: Why outputs may collapse
+
+- __English, non-instruction LM__: `distilgpt2` is small, English-only, and not instruction-tuned. With JA↔EN bridge, quality depends on MT.
+- __Untrained `p_proj` mapping__: The projection `p_proj(256→hidden)` is untrained; too-strong prefixes can distort the LM embedding space.
+- __Prefix injection details__: We prepend a soft prefix via `inputs_embeds` only and build a matching `attention_mask`. Mixing `input_ids` and `inputs_embeds` is avoided.
+
+### Quick fixes (no retraining)
+
+- Use stabilization flags: `--prefix_scale 0.05`, `--prefix_len 8`, or try `--no_prefix` for a baseline.
+- Adjust decoding: lower `--temperature` to 0.2–0.4, keep `--top_p 0.9`, set `--no_repeat_ngram_size 4`, `--repetition_penalty 1.1`.
+- Optionally switch to a multilingual/instruction LM and disable bridge to test prompt following quality.
 
 ## Model Architecture (overview)
 

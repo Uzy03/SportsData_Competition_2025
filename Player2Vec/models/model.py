@@ -88,9 +88,8 @@ class SLMWrapper(nn.Module):
         for p in self.model.parameters():
             p.requires_grad = False
         self.hidden = self.model.config.hidden_size
-        self.encoder_prefix = nn.Parameter(torch.zeros(32, self.hidden))
-        self.decoder_prefix = nn.Parameter(torch.zeros(1, self.hidden))
         self.p_proj = nn.Linear(256, self.hidden)
+        self.prefix_ln = nn.LayerNorm(self.hidden)
 
     def generate(
         self,
@@ -102,15 +101,22 @@ class SLMWrapper(nn.Module):
         top_p: float = 0.9,
         repetition_penalty: float = 1.2,
         no_repeat_ngram_size: int = 3,
+        prefix_scale: float = 0.05,
+        prefix_len: int = 8,
+        no_prefix: bool = False,
     ) -> str:
         device = next(self.parameters()).device
         if p.dim() == 1:
             p = p.unsqueeze(0)
-        prefix = self.p_proj(p) + self.decoder_prefix  # (B, hidden)
         tokens = self.tokenizer(question, return_tensors="pt", add_special_tokens=False)
         input_ids = tokens.input_ids.to(device)
         inputs_embeds = self.model.get_input_embeddings()(input_ids)
-        inputs_embeds = torch.cat([prefix.unsqueeze(1), inputs_embeds], dim=1)
+        if not no_prefix:
+            # LayerNorm then scale; repeat across prefix_len
+            prefix_vec = self.prefix_ln(self.p_proj(p))  # (B, hidden)
+            prefix_vec = prefix_scale * prefix_vec
+            soft_prefix = prefix_vec.unsqueeze(1).expand(-1, int(max(prefix_len, 1)), -1)  # (B,P,hidden)
+            inputs_embeds = torch.cat([soft_prefix, inputs_embeds], dim=1)
         # Build attention mask for prefix+tokens
         attention_mask = torch.ones(inputs_embeds.size()[:2], dtype=torch.long, device=device)
         output_ids = self.model.generate(
