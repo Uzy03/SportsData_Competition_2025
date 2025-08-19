@@ -22,7 +22,7 @@ def main():
     
     # データモジュールの初期化
     print("データモジュールを初期化中...")
-    from datamodules.datamodule import PreprocessedSoccerDataModule
+    from Player2Vec.datamodules.datamodule import PreprocessedSoccerDataModule
     data_module = PreprocessedSoccerDataModule(
         data_dir=args.data_dir,
         batch_size=args.batch_size,
@@ -34,7 +34,7 @@ def main():
     
     # モデルの初期化
     print("モデルを初期化中...")
-    from models.model import SoccerLightningModule
+    from Player2Vec.models.model import SoccerLightningModule
     model = SoccerLightningModule(
         num_players=100,  # 選手数
         num_teams=2,      # チーム数
