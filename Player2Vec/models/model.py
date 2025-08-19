@@ -77,7 +77,8 @@ class MultiTaskHeads(nn.Module):
 class SLMWrapper(nn.Module):
     def __init__(self, model_name: str = "distilgpt2"):
         super().__init__()
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # Force slow tokenizer to avoid protobuf requirement when converting SP/T5 tokenizers
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
         self.model = AutoModelForCausalLM.from_pretrained(model_name)
         # Ensure pad token is set to eos if missing (common for GPT2 family)
         if self.tokenizer.pad_token is None:

@@ -15,7 +15,7 @@ set -euo pipefail
 DEFAULT_QUESTION="川崎フロンターレの家長　昭博選手について教えて"
 DEFAULT_EMB_PATH="checkpoints/player_embeddings.pt"
 DEFAULT_PLAYERS_CSV="data/players.csv"
-DEFAULT_MODEL="rinna/japanese-gpt2-medium"
+DEFAULT_MODEL="distilgpt2"
 DEFAULT_MAX_NEW_TOKENS="128"
 # If set (non-empty), skip name resolution and use this id directly
 DEFAULT_PLAYER_ID="4609"
@@ -26,6 +26,8 @@ DEFAULT_REPETITION_PENALTY="1.2"
 DEFAULT_NO_REPEAT_NGRAM_SIZE="3"
 # Prompt template (on by default)
 DEFAULT_USE_PROMPT_TEMPLATE="1"
+# Bridge JA↔EN (on by default): JA question → EN generate → JA answer
+DEFAULT_BRIDGE_JA_EN="1"
 # ----------------------------------------
 
 QUESTION=${1:-${DEFAULT_QUESTION}}
@@ -58,6 +60,11 @@ CMD=(python -m Player2Vec.infer_style \
 # Toggle prompt template
 if [[ "${DEFAULT_USE_PROMPT_TEMPLATE}" == "1" ]]; then
   CMD+=(--use_prompt_template)
+fi
+
+# Toggle JA↔EN bridge
+if [[ "${DEFAULT_BRIDGE_JA_EN}" == "1" ]]; then
+  CMD+=(--bridge_ja_en)
 fi
 
 if [[ -n "${PLAYER_ID}" ]]; then

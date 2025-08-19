@@ -175,7 +175,8 @@ def _resolve_player_id(question: str, roster: List[Dict[str, str]]) -> Optional[
 
 @lru_cache(maxsize=2)
 def _load_mt(model_name: str):
-    tok = AutoTokenizer.from_pretrained(model_name)
+    # Force slow tokenizer to avoid protobuf requirement when converting SP/T5 tokenizers
+    tok = AutoTokenizer.from_pretrained(model_name, use_fast=False)
     mdl = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     return tok, mdl
 
@@ -301,7 +302,7 @@ def main():
     parser.add_argument("--player_id", type=str, required=False, help="If omitted, resolve from question using --players_csv")
     parser.add_argument("--question", type=str, required=True)
     parser.add_argument("--emb", type=str, default="checkpoints/player_embeddings.pt", help="Path to p embeddings (.pt/.pth/.csv)")
-    parser.add_argument("--model", type=str, default="rinna/japanese-gpt2-medium", help="HF Causal LM model name")
+    parser.add_argument("--model", type=str, default="distilgpt2", help="HF Causal LM model name")
     parser.add_argument("--max_new_tokens", type=int, default=64)
     parser.add_argument("--players_csv", type=str, default=None, help="Roster CSV with columns: id,name,team,alt_names (alt separated by '|')")
     # Decoding params (SLM)
