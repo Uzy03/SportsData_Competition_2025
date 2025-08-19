@@ -221,6 +221,12 @@ def generate_style(
     prefix_scale: float = 0.05,
     prefix_len: int = 8,
     no_prefix: bool = False,
+    # extras
+    length_penalty: float = 1.0,
+    num_beams: int = 1,
+    do_sample: bool = True,
+    seed: Optional[int] = None,
+    p_proj_ckpt: Optional[str] = None,
 ) -> str:
     """
     Load p from emb_path and generate natural language with SLMWrapper.
@@ -257,6 +263,20 @@ def generate_style(
         device = "cuda" if torch.cuda.is_available() else "cpu"
     slm = slm.to(device)
 
+    # Optional: load p_proj weights
+    if p_proj_ckpt:
+        if not os.path.exists(p_proj_ckpt):
+            raise FileNotFoundError(f"p_proj_ckpt not found: {p_proj_ckpt}")
+        state = torch.load(p_proj_ckpt, map_location="cpu")
+        try:
+            # allow both full state_dict and submodule-only state
+            if isinstance(state, dict) and any(k.startswith("p_proj.") for k in state.keys()):
+                slm.load_state_dict(state, strict=False)
+            else:
+                slm.p_proj.load_state_dict(state, strict=False)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load p_proj from {p_proj_ckpt}: {e}")
+
     # Optional prompt template
     prompt = question
     if use_prompt_template:
@@ -285,6 +305,13 @@ def generate_style(
                 top_p=top_p,
                 repetition_penalty=repetition_penalty,
                 no_repeat_ngram_size=no_repeat_ngram_size,
+                prefix_scale=prefix_scale,
+                prefix_len=prefix_len,
+                no_prefix=no_prefix,
+                length_penalty=length_penalty,
+                num_beams=num_beams,
+                do_sample=do_sample,
+                seed=seed,
             )
             # EN -> JA
             text = _translate(en_out, mt_en_ja, device=device)
@@ -300,6 +327,10 @@ def generate_style(
                 prefix_scale=prefix_scale,
                 prefix_len=prefix_len,
                 no_prefix=no_prefix,
+                length_penalty=length_penalty,
+                num_beams=num_beams,
+                do_sample=do_sample,
+                seed=seed,
             )
     return text
 
@@ -321,6 +352,12 @@ def main():
     parser.add_argument("--prefix_scale", type=float, default=0.05, help="Scale for soft prefix strength (e.g., 0.05)")
     parser.add_argument("--prefix_len", type=int, default=8, help="Soft prefix length P (tokens)")
     parser.add_argument("--no_prefix", action="store_true", help="Disable prefix injection for ablation/baseline")
+    # Extras
+    parser.add_argument("--length_penalty", type=float, default=1.0)
+    parser.add_argument("--num_beams", type=int, default=1)
+    parser.add_argument("--do_sample", action="store_true")
+    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--p_proj_ckpt", type=str, default=None, help="Path to p_proj checkpoint (state_dict)")
     # Prompt template
     parser.add_argument("--use_prompt_template", action="store_true")
     # MT bridge (off by default, kept for optional use)
@@ -347,6 +384,11 @@ def main():
         prefix_scale=args.prefix_scale,
         prefix_len=args.prefix_len,
         no_prefix=args.no_prefix,
+        length_penalty=args.length_penalty,
+        num_beams=args.num_beams,
+        do_sample=args.do_sample,
+        seed=args.seed,
+        p_proj_ckpt=args.p_proj_ckpt,
     )
     print(answer)
 

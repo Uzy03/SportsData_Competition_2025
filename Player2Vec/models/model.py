@@ -104,6 +104,11 @@ class SLMWrapper(nn.Module):
         prefix_scale: float = 0.05,
         prefix_len: int = 8,
         no_prefix: bool = False,
+        # extras
+        length_penalty: float = 1.0,
+        num_beams: int = 1,
+        do_sample: bool = True,
+        seed: int | None = None,
     ) -> str:
         device = next(self.parameters()).device
         if p.dim() == 1:
@@ -111,6 +116,12 @@ class SLMWrapper(nn.Module):
         tokens = self.tokenizer(question, return_tensors="pt", add_special_tokens=False)
         input_ids = tokens.input_ids.to(device)
         inputs_embeds = self.model.get_input_embeddings()(input_ids)
+        # Optional seeding for reproducibility
+        if seed is not None:
+            try:
+                torch.manual_seed(seed)
+            except Exception:
+                pass
         if not no_prefix:
             # LayerNorm then scale; repeat across prefix_len
             prefix_vec = self.prefix_ln(self.p_proj(p))  # (B, hidden)
@@ -119,17 +130,25 @@ class SLMWrapper(nn.Module):
             inputs_embeds = torch.cat([soft_prefix, inputs_embeds], dim=1)
         # Build attention mask for prefix+tokens
         attention_mask = torch.ones(inputs_embeds.size()[:2], dtype=torch.long, device=device)
+        # Input length guard (trim to model max positions)
+        max_pos = getattr(self.model.config, "max_position_embeddings", None)
+        if isinstance(max_pos, int) and inputs_embeds.size(1) > max_pos:
+            # Keep the last max_pos tokens (prefixは先頭にあるため、全体長でスライス)
+            inputs_embeds = inputs_embeds[:, -max_pos:, :]
+            attention_mask = attention_mask[:, -max_pos:]
         output_ids = self.model.generate(
             inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
             max_new_tokens=max_new_tokens,
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
-            do_sample=True,
+            do_sample=do_sample if num_beams <= 1 else False,
             temperature=temperature,
             top_p=top_p,
             no_repeat_ngram_size=no_repeat_ngram_size,
             repetition_penalty=repetition_penalty,
+            length_penalty=length_penalty,
+            num_beams=num_beams,
         )
         text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True).strip()
         return text

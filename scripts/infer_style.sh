@@ -15,22 +15,22 @@ set -euo pipefail
 DEFAULT_QUESTION="川崎フロンターレの家長　昭博選手について教えて"
 DEFAULT_EMB_PATH="checkpoints/player_embeddings.pt"
 DEFAULT_PLAYERS_CSV="data/players.csv"
-DEFAULT_MODEL="distilgpt2"
+DEFAULT_MODEL="Qwen/Qwen2.5-1.5B-Instruct"  # 軽量・多言語の指示追従LM（要 transformers >= 4.40 目安）
 DEFAULT_MAX_NEW_TOKENS="128"
 # If set (non-empty), skip name resolution and use this id directly
 DEFAULT_PLAYER_ID="4609"
 # Decoding defaults
-DEFAULT_TEMPERATURE="0.7"
+DEFAULT_TEMPERATURE="0.3"         # 推奨: 0.2〜0.4
 DEFAULT_TOP_P="0.9"
-DEFAULT_REPETITION_PENALTY="1.2"
-DEFAULT_NO_REPEAT_NGRAM_SIZE="3"
+DEFAULT_REPETITION_PENALTY="1.1"
+DEFAULT_NO_REPEAT_NGRAM_SIZE="4"
 # Prompt template (on by default)
 DEFAULT_USE_PROMPT_TEMPLATE="1"
-# Bridge JA↔EN (on by default): JA question → EN generate → JA answer
-DEFAULT_BRIDGE_JA_EN="1"
+# Bridge JA↔EN (off by default for instruct LM)
+DEFAULT_BRIDGE_JA_EN="0"
 # Prefix control (stabilization)
-DEFAULT_PREFIX_SCALE="0.05"
-DEFAULT_PREFIX_LEN="8"
+DEFAULT_PREFIX_SCALE="0.05"        # 学習前は小さめから
+DEFAULT_PREFIX_LEN="8"             # 1ではなく8程度に
 DEFAULT_NO_PREFIX="0"  # set to 1 to disable prefix injection
 # ----------------------------------------
 
@@ -88,4 +88,16 @@ else
   fi
 fi
 
-"${CMD[@]}"
+if [[ "${RUN_BASELINES:-0}" == "1" ]]; then
+  mkdir -p outputs
+  ts=$(date +"%Y%m%d_%H%M%S")
+  out1="outputs/infer_prefix_${ts}.txt"
+  out2="outputs/infer_noprefix_${ts}.txt"
+  echo "[INFO] Running with prefix → ${out1}" >&2
+  "${CMD[@]}" | tee "${out1}"
+  echo "\n===== BASELINE (no_prefix) =====\n" | tee -a "${out1}"
+  echo "[INFO] Running without prefix → ${out2}" >&2
+  "${CMD[@]}" --no_prefix | tee "${out2}"
+else
+  "${CMD[@]}"
+fi
