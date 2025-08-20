@@ -149,10 +149,13 @@ class SLMWrapper(nn.Module):
         outputs = self.model(
             inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
-            output_hidden_states=False,
+            output_hidden_states=True,
             return_dict=True,
         )
-        last_hidden = outputs.last_hidden_state  # (B, T, H)
+        # For CausalLM, last hidden is in hidden_states[-1]
+        if getattr(outputs, "hidden_states", None) is None or len(outputs.hidden_states) == 0:
+            raise RuntimeError("Model did not return hidden_states; ensure output_hidden_states=True and model supports it")
+        last_hidden = outputs.hidden_states[-1]  # (B, T, H)
         # locate style token position within input_ids (before prefix), then offset by prefix_len
         style_positions = (input_ids[0] == style_id).nonzero(as_tuple=False)
         if style_positions.numel() == 0:

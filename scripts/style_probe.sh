@@ -19,7 +19,7 @@ set -euo pipefail
 # === Defaults (edit as needed) ===
 EMB_PATH="checkpoints/player_embeddings.pt"
 OUT_DIR="checkpoints"
-MODEL_NAME="distilgpt2"
+MODEL_NAME="Qwen/Qwen2.5-1.5B-Instruct"
 PREFIX_SCALE=0.05
 PREFIX_LEN=8
 NO_PREFIX=0

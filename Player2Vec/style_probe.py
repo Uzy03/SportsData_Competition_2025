@@ -47,7 +47,7 @@ def default_prompt() -> str:
 def compute_style_vectors(
     emb_path: str,
     out_dir: str = "checkpoints",
-    model_name: str = "distilgpt2",
+    model_name: str = "Qwen/Qwen2.5-1.5B-Instruct",
     prefix_scale: float = 0.05,
     prefix_len: int = 8,
     no_prefix: bool = False,
@@ -213,7 +213,7 @@ def main():
     parser = argparse.ArgumentParser(description="StyleProbe: extract style embeddings using soft prefix and fixed prompt")
     parser.add_argument("--emb", type=str, default="checkpoints/player_embeddings.pt", help="Path to p embeddings (.pt/.pth/.csv)")
     parser.add_argument("--out", type=str, default="checkpoints", help="Output directory")
-    parser.add_argument("--model", type=str, default="distilgpt2", help="HF Causal LM model name")
+    parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-1.5B-Instruct", help="HF Causal LM model name")
     parser.add_argument("--prefix_scale", type=float, default=0.05)
     parser.add_argument("--prefix_len", type=int, default=8)
     parser.add_argument("--no_prefix", action="store_true")
