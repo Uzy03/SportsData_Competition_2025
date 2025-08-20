@@ -231,11 +231,24 @@ class SLMWrapper(nn.Module):
         return text
 
 class SoccerLightningModule(pl.LightningModule):
-    def __init__(self, num_players=100, num_teams=2, lr: float = 1e-3):
+    def __init__(self, num_players=100, num_teams=2, lr: float = 1e-3,
+                 model_name: str = "distilgpt2",
+                 prefix_scale: float = 0.05,
+                 prefix_len: int = 8,
+                 no_prefix: bool = False,
+                 style_token: str = "<STYLE>",
+                 prompt: str | None = None):
         super().__init__()
         self.save_hyperparameters()
         self.patch_encoder = PatchEncoder()
-        self.heads = MultiTaskHeads(emb_dim=4096)
+        # Frozen SLM wrapper
+        self.slm = SLMWrapper(model_name=model_name)
+        for p in self.slm.parameters():
+            p.requires_grad = False
+        # Reduce PatchEncoder(4096) -> 256 for SLM p_proj input
+        self.p_reduce = nn.Linear(4096, 256)
+        # Heads expect SLM hidden size
+        self.heads = MultiTaskHeads(emb_dim=self.slm.hidden)
         # 自己教師あり: 軌道予測のMSE
         self.criterion_delta = nn.MSELoss(reduction='none')
         # コントラスト学習
@@ -244,9 +257,51 @@ class SoccerLightningModule(pl.LightningModule):
         # ロス重み
         self.lambda_delta = 1.0
         self.lambda_infonce = 0.5
+        # SLM config
+        self.prefix_scale = prefix_scale
+        self.prefix_len = prefix_len
+        self.no_prefix = no_prefix
+        self.style_token = style_token
+        if prompt is None:
+            self.prompt = (
+                "[INST] あなたはサッカーアナリストです。\n"
+                "以下の情報を読み取り、直後の <STYLE> の内部表現に\n"
+                "選手のプレースタイルを要約して保持してください。\n"
+                "<STYLE> その後のテキストは無視して構いません。 [/INST]"
+            )
+        else:
+            self.prompt = prompt
 
     def forward(self, patch):
-        emb = F.normalize(self.patch_encoder(patch), dim=-1)
+        # Returns normalized SLM-derived embedding for a batch of patches
+        return self._slm_embed_from_patch(patch)
+
+    def _slm_embed_from_patch(self, patch: torch.Tensor) -> torch.Tensor:
+        """Compute SLM hidden vectors from PatchEncoder outputs.
+        1) PatchEncoder -> 4096-d
+        2) reduce to 256-d
+        3) inject as soft prefix into frozen SLM and take hidden at style token
+        4) L2 normalize
+        """
+        device = patch.device
+        # (B, 4096)
+        p4096 = F.normalize(self.patch_encoder(patch), dim=-1)
+        # (B, 256)
+        p256 = self.p_reduce(p4096)
+        # Per-sample style probe (style_probe currently handles single prompt sequence)
+        vecs = []
+        for i in range(p256.size(0)):
+            v = self.slm.style_probe(
+                p256[i],
+                self.prompt,
+                style_token=self.style_token,
+                prefix_scale=self.prefix_scale,
+                prefix_len=self.prefix_len,
+                no_prefix=self.no_prefix,
+            )
+            vecs.append(v)
+        emb = torch.stack(vecs, dim=0).to(device)
+        emb = F.normalize(emb, dim=-1)
         return emb
 
     @staticmethod
@@ -283,7 +338,8 @@ class SoccerLightningModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         patch, player_ids, team_id = batch  # player_ids, team_idは未使用
-        emb = F.normalize(self.patch_encoder(patch), dim=-1)
+        # Use SLM-derived embeddings
+        emb = self._slm_embed_from_patch(patch)
         # 軌道予測（最後の2フレームのdelta）
         pred_delta = self.heads(emb)
         target_delta = self._last_step_delta(patch)
@@ -306,7 +362,7 @@ class SoccerLightningModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         patch, player_ids, team_id = batch
-        emb = F.normalize(self.patch_encoder(patch), dim=-1)
+        emb = self._slm_embed_from_patch(patch)
         pred_delta = self.heads(emb)
         target_delta = self._last_step_delta(patch)
         last = patch[:, :, -1, :]
@@ -325,7 +381,7 @@ class SoccerLightningModule(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         patch, player_ids, team_id = batch
-        emb = F.normalize(self.patch_encoder(patch), dim=-1)
+        emb = self._slm_embed_from_patch(patch)
         pred_delta = self.heads(emb)
         target_delta = self._last_step_delta(patch)
         last = patch[:, :, -1, :]
