@@ -1,43 +1,33 @@
-aiohappyeyeballs==2.6.1
-aiohttp==3.12.15
-aiosignal==1.4.0
-attrs==25.3.0
-certifi==2025.8.3
-charset-normalizer==3.4.3
-filelock==3.18.0
-frozenlist==1.7.0
-fsspec==2025.7.0
-hf-xet==1.1.7
+# 🔽 PyTorch 1.13.1 + CUDA 11.6（公式ホイールを使う）
+--index-url https://download.pytorch.org/whl/cu116
+
+numpy==1.26.4
+torch==1.13.1+cu116
+# torchvision / torchaudio が不要なら入れないほうが軽量です
+# torchaudio==0.13.1
+# torchvision==0.14.1+cu116
+
+# 🔽 Lightning 周辺（1.x 系で torch1.13 と相性良）
+pytorch-lightning==1.9.5
+torchmetrics==0.11.4
+
+# 🔽 Transformers（Qwen2 など新しめモデルも扱える範囲）
+transformers==4.46.1
+tokenizers==0.20.3
+tiktoken>=0.5.2
+
+# 🔽 可視化・解析（ヘッドレスでも保存可）
+scikit-learn==1.4.2
+matplotlib==3.9.2
+
+# 🔽 よく使う周辺
 huggingface-hub==0.34.4
-idna==3.10
-Jinja2==3.1.6
-lightning-utilities==0.15.2
-MarkupSafe==3.0.2
-mpmath==1.3.0
-multidict==6.6.3
-networkx==3.5
-numpy==2.3.2
-packaging==25.0
-pandas==2.3.1
-propcache==0.3.2
-pyarrow==21.0.0
-python-dateutil==2.9.0.post0
-pytorch-lightning==2.5.2
-pytz==2025.2
-PyYAML==6.0.2
-regex==2025.7.34
-requests==2.32.4
-safetensors==0.6.2
-six==1.17.0
-sympy==1.14.0
-tokenizers==0.21.4
 sentencepiece==0.2.0
 sacremoses==0.1.1
-torch==2.8.0
-torchmetrics==1.8.1
 tqdm==4.67.1
-transformers==4.55.0
-typing_extensions==4.14.1
-tzdata==2025.2
-urllib3==2.5.0
-yarl==1.20.1
+
+# --- ここから下にプロジェクト固有の依存を追加してください ---
+# 例）
+# pandas==2.2.3
+# pyyaml==6.0.2
+# rich==13.9.4

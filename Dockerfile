@@ -1,28 +1,28 @@
-# ベースイメージ
-FROM python:3.11-slim-bullseye
+# === Single-stack image (CUDA 11.6 runtime via wheels) =======================
+# PyTorch 1.13.1+cu116 は Python 3.10 が安定
+FROM python:3.10-slim-bookworm
 
-# OSパッケージのアップデート
-RUN apt-get update && apt-get upgrade -y && apt-get clean
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONUNBUFFERED=1 \
+    MPLBACKEND=Agg \
+    PYTHONNOUSERSITE=1 \
+    HF_HUB_DISABLE_SYMLINKS_WARNING=1
 
-# 必要なパッケージのみインストール
-# RUN apt-get install -y <必要なパッケージ>
-
-# 作業ディレクトリの作成
 WORKDIR /workspace
 
-# 必要なパッケージのインストール
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    git \
-    && apt-get upgrade -y \
-    && rm -rf /var/lib/apt/lists/*
+# 基本ユーティリティ（必要最小限）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git ca-certificates tini \
+ && rm -rf /var/lib/apt/lists/*
 
-# requirements.txtのコピーとインストール
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# 依存インストール（cu116 用インデックスで torch を取得）
+COPY requirements.txt /workspace/requirements.txt
+RUN python -m pip install --upgrade pip \
+ && python -m pip install --no-cache-dir -r requirements.txt
 
-# ソースコードのコピー
-COPY . /workspace
+# ビルド時にインストール確認（GPU無しでもOK）
+RUN python - <<'PY'\nimport torch, numpy\nprint('torch', torch.__version__, 'cuda', torch.version.cuda)\nprint('numpy', numpy.__version__)\nPY
 
-# デフォルトコマンド
-# CMD ["python", "Player2Vec/main.py"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["bash"]
