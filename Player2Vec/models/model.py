@@ -91,6 +91,80 @@ class SLMWrapper(nn.Module):
         self.p_proj = nn.Linear(256, self.hidden)
         self.prefix_ln = nn.LayerNorm(self.hidden)
 
+    def _ensure_special_token(self, token: str) -> int:
+        """Ensure a special token exists in tokenizer and model embeddings.
+        Returns its token id.
+        """
+        vocab = self.tokenizer.get_vocab()
+        if token in vocab:
+            return vocab[token]
+        # add and resize
+        self.tokenizer.add_special_tokens({"additional_special_tokens": [token]})
+        self.model.resize_token_embeddings(len(self.tokenizer))
+        # fetch id after resize
+        token_id = self.tokenizer.convert_tokens_to_ids(token)
+        return token_id
+
+    @torch.no_grad()
+    def style_probe(
+        self,
+        p: torch.Tensor,
+        prompt: str,
+        *,
+        style_token: str = "<STYLE>",
+        prefix_scale: float = 0.05,
+        prefix_len: int = 8,
+        no_prefix: bool = False,
+        seed: int | None = None,
+    ) -> torch.Tensor:
+        """Return the last-layer hidden state at the style_token position.
+        - Inject soft prefix derived from p (same as generate)
+        - Append/ensure style_token is in the prompt
+        Returns: Tensor(hidden)
+        """
+        device = next(self.parameters()).device
+        if p.dim() == 1:
+            p = p.unsqueeze(0)
+        # Ensure special token exists and in the prompt
+        style_id = self._ensure_special_token(style_token)
+        if style_token not in prompt:
+            prompt = prompt + " " + style_token
+        tokens = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
+        input_ids = tokens.input_ids.to(device)
+        inputs_embeds = self.model.get_input_embeddings()(input_ids)
+        # Optional seed
+        if seed is not None:
+            try:
+                torch.manual_seed(seed)
+            except Exception:
+                pass
+        # prefix
+        if not no_prefix:
+            prefix_vec = self.prefix_ln(self.p_proj(p))  # (B, hidden)
+            prefix_vec = prefix_scale * prefix_vec
+            soft_prefix = prefix_vec.unsqueeze(1).expand(-1, int(max(prefix_len, 1)), -1)
+            inputs_embeds = torch.cat([soft_prefix, inputs_embeds], dim=1)
+        attention_mask = torch.ones(inputs_embeds.size()[:2], dtype=torch.long, device=device)
+        # forward with hidden states
+        outputs = self.model(
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            output_hidden_states=False,
+            return_dict=True,
+        )
+        last_hidden = outputs.last_hidden_state  # (B, T, H)
+        # locate style token position within input_ids (before prefix), then offset by prefix_len
+        style_positions = (input_ids[0] == style_id).nonzero(as_tuple=False)
+        if style_positions.numel() == 0:
+            # fallback: use last token position (before prefix)
+            pos = input_ids.size(1) - 1
+        else:
+            pos = int(style_positions[-1].item())
+        if not no_prefix:
+            pos = pos + int(max(prefix_len, 1))
+        vec = last_hidden[0, pos, :].detach()
+        return vec
+
     def generate(
         self,
         p: torch.Tensor,
